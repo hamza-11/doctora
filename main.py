@@ -9,9 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 import os
 
-# تحديث مسار tesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
 app = FastAPI()
 
 app.add_middleware(
