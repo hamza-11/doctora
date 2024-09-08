@@ -1,7 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 import cv2
-import pytesseract
 from PIL import Image
 import numpy as np
 import io
@@ -19,6 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# تأكد من ضبط متغير البيئة GEMINI_API_KEY بالمفتاح الصحيح
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+
 @app.post("/process_image/")
 async def process_image(file: UploadFile = File(...)):
     contents = await file.read()
@@ -28,23 +30,18 @@ async def process_image(file: UploadFile = File(...)):
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     # تحويل الصورة إلى PIL Image
     pil_image = Image.fromarray(frame_rgb)
-    # استخراج النصوص من الصورة
-    text = pytesseract.image_to_string(pil_image, lang='eng')
-    response = {"text": text}
-    return JSONResponse(content=response)
-
-# تأكد من ضبط متغير البيئة GEMINI_API_KEY بالمفتاح الصحيح
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    
+    # استخدام Gemini للتعرف على النص في الصورة
+    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+    prompt = "Extract and return only the text from this image. Do not include any additional commentary or description."
+    response = model.generate_content([prompt, pil_image])
+    
+    return JSONResponse(content={"text": response.text})
 
 @app.post("/generate-content/")
 async def generate_content(prompt: str = Form(...), image: UploadFile = File(...)):
     try:
         img = Image.open(io.BytesIO(await image.read()))
-
-        # افتراض أنك تقوم بحفظ الصورة مؤقتاً لاستخدامها مع النموذج
-        img.save("temp_image.jpg")
-        img = Image.open("temp_image.jpg")
-
         model = genai.GenerativeModel(model_name="gemini-1.5-flash")
         response = model.generate_content([prompt, img])
         return JSONResponse(content={"text": response.text})
